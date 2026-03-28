@@ -1,0 +1,44 @@
+name: code-review-env
+description: >
+  A multi-step simulation environment for automated code review.
+  An AI agent reviews pull requests, identifies issues, assigns severity,
+  and interacts with a simulated developer across multiple iterations.
+
+version: 1.0
+
+observation_space:
+  diff: string
+  comments: list
+  iteration: integer
+
+action_space:
+  action_type:
+    type: string
+    allowed: [comment, approve, request_changes]
+  issue_id:
+    type: integer
+    nullable: true
+  severity:
+    type: string
+    nullable: true
+    allowed: [low, medium, high]
+
+reward:
+  type: continuous
+  range: [-5.0, 1.5]
+
+tasks:
+  - easy
+  - medium
+  - hard
+
+task_definitions:
+  easy:
+    objective: Catch obvious correctness and safety issues in a short diff.
+    complexity: easy
+  medium:
+    objective: Identify performance and safety issues in a noisier change.
+    complexity: medium
+  hard:
+    objective: Balance correctness, performance, and safety across interacting defects.
+    complexity: hard
