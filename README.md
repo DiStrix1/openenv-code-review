@@ -1,3 +1,9 @@
+---
+title: Code Review Environment
+sdk: docker
+app_port: 8000
+---
+
 # Code Review Simulation Environment
 
 This repository implements a deterministic, multi-step reinforcement learning environment for code review simulation.

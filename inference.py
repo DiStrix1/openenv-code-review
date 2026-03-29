@@ -198,6 +198,16 @@ else:
         return state.model_dump() if hasattr(state, "model_dump") else dict(state)
 
 
+@app.get("/")
+def root_route() -> Dict[str, Any]:
+    return {
+        "service": "code_review_env",
+        "status": "running",
+        "openenv_available": OPENENV_AVAILABLE,
+        "docs": "/docs",
+    }
+
+
 def main() -> None:
     import uvicorn
 
