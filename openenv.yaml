@@ -1,0 +1,10 @@
+spec_version: 1
+name: code_review_env
+version: "0.1.0"
+description: "Deterministic multi-step code review simulation environment."
+type: space
+runtime: fastapi
+app: inference:app
+port: 8000
+action: CodeReviewAction
+observation: CodeReviewObservation
