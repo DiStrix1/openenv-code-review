@@ -38,3 +38,5 @@ class CodeReviewState(State):
     total_issues: int = 0
     difficulty: str = "medium"
     max_steps: int = 10
+    llm_evaluation_mode: str = "heuristic"
+    last_llm_score: float = 0.0

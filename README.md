@@ -1,220 +1,204 @@
-# Code Review Simulation Environment (OpenEnv)
+# Code Review Simulation Environment
 
-### Meta x HuggingFace OpenEnv Hackathon Submission
+This repository implements a deterministic, multi-step reinforcement learning environment for code review simulation.
 
-A reinforcement learning-style environment that simulates real-world code review interactions between an agent and a developer, enabling iterative improvement of code quality through structured feedback and rewards.
+## Overview
 
----
+The environment models an iterative review loop between an agent and a developer simulator:
 
-# Problem
+1. The agent selects a review action.
+2. The developer simulator responds by fixing issues, failing to fix, or introducing regressions.
+3. The environment updates state, computes reward, and records transition metadata.
+4. The episode ends when all ground-truth issues are resolved or `max_steps` is reached.
 
-Modern code review tools are static and one-shot:
+## Environment Interface
 
-* No interaction loop
-* No evolving state
-* No measurable learning signal
+The core environment is implemented in `env/environment.py` as `CodeReviewEnv`.
 
-This makes them unsuitable for training intelligent agents.
+- `reset()` initializes a task episode.
+- `step(action)` applies action, simulates transition, computes reward, and returns `(next_state, reward, done, info)`.
+- `state()` returns the current observation dictionary.
 
----
+### State Schema
 
-# Solution
-
-This project introduces a Code Review Simulation Environment where:
-
-* An agent reviews code and takes actions
-* A developer simulator responds by fixing issues or introducing new ones
-* The environment evolves over multiple steps
-* A reward system evaluates agent behavior
-* A grader measures final code quality
-
-This reframes code review as a sequential decision-making problem.
-
----
-
-# Environment Design
-
-## Interaction Loop
-
-```python
-obs = env.reset()
-
-while not done:
-    action = agent(obs)
-    obs, reward, done, info = env.step(action)
-```
-
----
-
-## Action Space
-
-```python
-ACTIONS = [
-    "flag_issue",
-    "suggest_fix",
-    "optimize_code",
-    "ignore"
-]
-```
-
-Each action has a clearly defined and deterministic effect.
-
----
-
-## State Representation
+The observation includes the required fields:
 
 ```python
 {
     "code": str,
     "issues": list,
     "history": list,
-    "step_count": int
+    "step_count": int,
 }
 ```
 
----
+Additional fields used by evaluation and APIs:
 
-## Developer Simulator
+- `total_issues`
+- `max_steps`
+- `llm_evaluation_mode`
 
-Simulates realistic developer behavior:
+## Action Space
 
-* Fixes issues probabilistically
-* May fail to fix
-* May introduce new bugs (especially in hard mode)
+Defined in `env/actions.py`:
 
-Behavior varies by difficulty:
+```python
+ACTIONS = [
+    "flag_issue",
+    "suggest_fix",
+    "optimize_code",
+    "ignore",
+]
+```
 
-* Easy: high reliability
-* Medium: balanced
-* Hard: noisy and error-prone
+Each action has explicit transition effects and validity checks.
 
----
+## Transition Model
 
-## Reward Function
+`env/developer.py` implements a seeded developer simulator with difficulty-aware behavior:
 
-The reward function is aligned with actual performance:
+- probabilistic issue fixing
+- failure outcomes
+- bounded bug introduction and follow-up regressions
+- context-dependent reliability adjustments
 
-* +2 for correct issue resolution
-* +3 for high severity issues
-* -2 for false positives
-* -1 for unnecessary or repeated actions
-* Step penalty for inefficiency
-* Bonus for early completion
+Difficulty modes:
 
-The reward signal reflects both code improvement and efficiency.
+- `easy`
+- `medium`
+- `hard`
 
----
+## Reward Model
 
-## Tasks
+`env/reward.py` computes a deterministic, bounded score (`[-5, 10]`) using:
 
-| Level  | Description                      |
-| ------ | -------------------------------- |
-| Easy   | Clear and obvious issues         |
-| Medium | Subtle and mixed issues          |
-| Hard   | Noisy, ambiguous, and misleading |
+- correct fixes
+- false positives
+- unnecessary actions
+- step efficiency
+- completion progress
+- aligned LLM transition signal
+- completion and early-finish bonuses
 
----
+Per-step reward is computed as score delta between consecutive states.
 
 ## Grading
 
-Final score is computed as:
+`env/grader.py` computes final task completion score based on unresolved ground-truth issues.
 
-```python
-grade = resolved_issues / total_issues
+- `1.0` indicates all ground-truth issues resolved.
+- Lower values indicate partial completion.
+
+## Task Suite
+
+Defined in `env/tasks.py`:
+
+- `EasyTask`
+- `MediumTask`
+- `HardTask`
+
+Task difficulty scales through issue complexity, dependencies, and noisy/misleading patterns.
+
+## LLM-Based Evaluation Integration
+
+`env/llm_evaluator.py` provides step-level evaluation signals used by:
+
+- reward shaping
+- transition dynamics (`llm_guidance`)
+- baseline strategy adaptation
+
+Modes:
+
+- deterministic heuristic mode (default)
+- optional remote OpenAI mode (explicit opt-in)
+
+Remote OpenAI mode requires:
+
+```bash
+set CODE_REVIEW_ENABLE_REMOTE_LLM=1
+set CODE_REVIEW_LLM_EVAL_MODE=openai
+set OPENAI_API_KEY=...
 ```
 
-* 1.0 indicates fully clean code
-* Lower values indicate partial improvement
+If remote mode is not available, the system falls back to deterministic heuristic mode.
 
----
+## Determinism and Reproducibility
 
-# Results (Baseline Agent)
+Randomness is controlled with seeded RNG usage (`random.seed(42)` and local seeded generators) across environment components.
+
+Baseline rollouts are deterministic under the same configuration.
+
+## Baseline Agent
+
+`baseline/run_baseline.py` includes a strategy-adaptive baseline that uses:
+
+- unresolved issue structure
+- action history
+- recent transition outcomes
+- LLM score trend signals
+
+## Running Locally
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run baseline evaluation:
+
+```bash
+python baseline/run_baseline.py
+```
+
+Run Gradio app:
+
+```bash
+python app.py
+```
+
+Run FastAPI/OpenEnv server:
+
+```bash
+python inference.py
+```
+
+## OpenEnv and Deployment Files
+
+- `openenv.yaml`
+- `inference.py`
+- `Dockerfile`
+- `requirements.txt`
+
+## Repository Structure
 
 ```text
-easy   → reward 9.00, grade 1.000
-medium → reward 3.50, grade 0.667
-hard   → reward 3.00, grade 0.500
-```
-
-## Observations
-
-* Clear separation across difficulty levels
-* Reward is aligned with performance
-* Hard task remains challenging but solvable
-
----
-
-# Why This Approach Matters
-
-This system:
-
-* Models interactive code review loops
-* Enables learning over multiple steps
-* Captures developer unpredictability
-* Provides measurable evaluation signals
-
-It is not a static tool, but a structured environment for training and evaluating intelligent agents.
-
----
-
-# Project Structure
-
-```
 env/
- ├── environment.py
- ├── developer.py
- ├── tasks.py
- ├── grader.py
- ├── models.py
+  __init__.py
+  actions.py
+  developer.py
+  environment.py
+  grader.py
+  llm_evaluator.py
+  models.py
+  reward.py
+  tasks.py
 
 baseline/
- ├── run_baseline.py
+  run_baseline.py
 
 app.py
 inference.py
 openenv.yaml
-Dockerfile
 requirements.txt
+Dockerfile
+README.md
 ```
 
----
+## Current Baseline Snapshot
 
-# Running Locally
-
-```bash
-pip install -r requirements.txt
-python app.py
+```text
+easy   -> reward 9.45, grade 1.000
+medium -> reward 4.70, grade 0.833
+hard   -> reward 3.73, grade 0.625
 ```
-
----
-
-# Deployment
-
-* Compatible with HuggingFace Spaces
-* OpenEnv API supported via FastAPI
-* Deterministic and reproducible
-
----
-
-# OpenEnv Compliance
-
-* Implements reset(), step(), and state()
-* Uses structured observation and action models
-* Deterministic execution
-* Container-ready setup
-
----
-
-# Future Work
-
-* Train RL agents (PPO, DQN)
-* Integrate real-world code datasets
-* Add static analysis tools
-* Extend to multi-agent review systems
-
----
-
-# Author
-
-Dishu
-B.Tech Student | Software Developer

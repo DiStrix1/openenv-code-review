@@ -36,6 +36,23 @@ def _unresolved_issues(issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [issue for issue in issues if not issue.get("resolved", False)]
 
 
+def _actionable_issues(
+    candidates: List[Dict[str, Any]],
+    all_issues: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    unresolved_ids = {
+        issue.get("id")
+        for issue in all_issues
+        if not issue.get("resolved", False)
+    }
+    actionable: List[Dict[str, Any]] = []
+    for issue in candidates:
+        requires = issue.get("requires", [])
+        if all(req_id not in unresolved_ids for req_id in requires):
+            actionable.append(issue)
+    return actionable
+
+
 def apply_action(
     action: str,
     issues: List[Dict[str, Any]],
@@ -67,7 +84,8 @@ def apply_action(
 
     if action == "flag_issue":
         target_pool = unresolved_ground_truth if unresolved_ground_truth else unresolved_introduced
-        target = _highest_priority_issue(target_pool)
+        actionable_pool = _actionable_issues(target_pool, unresolved)
+        target = _highest_priority_issue(actionable_pool if actionable_pool else target_pool)
         if target is None:
             effect["false_positive"] = True
         else:
@@ -93,7 +111,8 @@ def apply_action(
             target_pool = unresolved_ground_truth
         else:
             target_pool = unresolved
-        target = _highest_priority_issue(target_pool)
+        actionable_pool = _actionable_issues(target_pool, unresolved)
+        target = _highest_priority_issue(actionable_pool if actionable_pool else target_pool)
         if target is None:
             effect["false_positive"] = True
         else:
@@ -113,7 +132,9 @@ def apply_action(
     if action == "optimize_code":
         perf_issues = [issue for issue in unresolved if issue.get("type") == "performance"]
         perf_ground_truth = [issue for issue in perf_issues if issue.get("source") == "ground_truth"]
-        target = _highest_priority_issue(perf_ground_truth if perf_ground_truth else perf_issues)
+        target_pool = perf_ground_truth if perf_ground_truth else perf_issues
+        actionable_pool = _actionable_issues(target_pool, unresolved)
+        target = _highest_priority_issue(actionable_pool if actionable_pool else target_pool)
         if target is None:
             effect["unnecessary"] = True
         else:

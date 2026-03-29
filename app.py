@@ -23,6 +23,8 @@ def run_baseline_suite(max_steps: int) -> Tuple[List[List[Any]], Dict[str, Any]]
                 round(result["final_grade"], 3),
                 result["remaining_issues"],
                 result["remaining_total_issues"],
+                round(result["avg_llm_score"], 3),
+                result["llm_mode"],
             ]
         )
         summary["results"][task_name] = result
@@ -51,6 +53,8 @@ with gr.Blocks(title="Code Review Simulation Environment") as demo:
             "final_grade",
             "remaining_ground_truth_issues",
             "remaining_total_issues",
+            "avg_llm_score",
+            "llm_mode",
         ],
         value=[],
         interactive=False,

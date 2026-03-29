@@ -48,15 +48,19 @@ class CodeReviewEnvironment(Environment):
         self._state = self._build_state(initial_state)
 
     def _build_state(self, state: Dict[str, Any]) -> CodeReviewState:
+        history = state["history"]
+        last_llm_score = float(history[-1].get("llm_score", 0.0)) if history else 0.0
         return CodeReviewState(
             episode_id=self._episode_id,
             step_count=state["step_count"],
             code=state["code"],
             issues=state["issues"],
-            history=state["history"],
+            history=history,
             total_issues=state.get("total_issues", 0),
             difficulty=self._task_name,
             max_steps=self._env.max_steps,
+            llm_evaluation_mode=state.get("llm_evaluation_mode", "heuristic"),
+            last_llm_score=last_llm_score,
         )
 
     def _build_observation(
@@ -141,7 +145,10 @@ class CodeReviewEnvironment(Environment):
     def get_metadata(self) -> EnvironmentMetadata:
         return EnvironmentMetadata(
             name="CodeReviewEnvironment",
-            description="Multi-step code review simulation with deterministic rewards.",
+            description=(
+                "Multi-step code review simulation with deterministic rewards and "
+                "integrated step-level LLM evaluation signals."
+            ),
             version="0.1.0",
             author="OpenEnv Hackathon Submission",
             documentation_url="https://huggingface.co/spaces",

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 from .actions import ACTIONS, apply_action
 from .developer import DeveloperSimulator
+from .llm_evaluator import LLMEvaluator
 from .reward import compute_score
 from .tasks import BaseTask, EasyTask, HardTask, MediumTask
 
@@ -23,6 +24,7 @@ class CodeReviewEnv:
         )
 
         self.developer = DeveloperSimulator(self.task.difficulty)
+        self.evaluator = LLMEvaluator(self.task.difficulty)
 
     def _resolve_task(self, task: Union[str, BaseTask]) -> BaseTask:
         if isinstance(task, BaseTask):
@@ -38,7 +40,7 @@ class CodeReviewEnv:
     def _resolve_max_steps(self, max_steps: int, difficulty: str) -> int:
         difficulty_caps = {
             "easy": 12,
-            "medium": 9,
+            "medium": 10,
             "hard": 10,
         }
         fallback = difficulty_caps[difficulty]
@@ -55,6 +57,19 @@ class CodeReviewEnv:
     def _all_ground_truth_resolved(self) -> bool:
         return len(self._unresolved_ground_truth()) == 0
 
+    def _recent_llm_guidance(self, window: int = 2) -> float:
+        if not self.history:
+            return 0.5
+        recent = self.history[-window:]
+        scores = [
+            float(step.get("llm_score", 0.5))
+            for step in recent
+            if step.get("llm_score") is not None
+        ]
+        if not scores:
+            return 0.5
+        return sum(scores) / float(len(scores))
+
     def reset(self) -> Dict[str, Any]:
         self.step_count = 0
         self.done = False
@@ -66,6 +81,7 @@ class CodeReviewEnv:
             1 for issue in self.issues if issue.get("source") == "ground_truth"
         )
         self.developer.reset()
+        self.evaluator.reset(self.task.difficulty)
         return self.state()
 
     def state(self) -> Dict[str, Any]:
@@ -75,6 +91,8 @@ class CodeReviewEnv:
             "history": copy.deepcopy(self.history),
             "step_count": self.step_count,
             "total_issues": self.total_issues,
+            "max_steps": self.max_steps,
+            "llm_evaluation_mode": self.evaluator.mode,
         }
 
     def step(self, action: str) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
@@ -84,9 +102,11 @@ class CodeReviewEnv:
         if self.done:
             return self.state(), 0.0, True, {"reason": "episode_already_done"}
 
+        remaining_before = len(self._unresolved_ground_truth())
         score_before = compute_score(
             history=self.history,
-            remaining_issues=len(self._unresolved_ground_truth()),
+            remaining_issues=remaining_before,
+            total_issues=self.total_issues,
             step_count=self.step_count,
             done=False,
             max_steps=self.max_steps,
@@ -95,12 +115,26 @@ class CodeReviewEnv:
         action_effect = apply_action(action, self.issues, self.history)
 
         self.step_count += 1
+        llm_guidance = self._recent_llm_guidance(window=2)
         self.code, self.issues, developer_result = self.developer.respond(
             action=action,
             code=self.code,
             issues=self.issues,
             action_effect=action_effect,
             step_count=self.step_count,
+            llm_guidance=llm_guidance,
+        )
+        remaining_after = len(self._unresolved_ground_truth())
+        llm_evaluation = self.evaluator.evaluate(
+            action=action,
+            action_effect=action_effect,
+            developer_result=developer_result,
+            remaining_before=remaining_before,
+            remaining_after=remaining_after,
+            step_count=self.step_count,
+            max_steps=self.max_steps,
+            total_issues=self.total_issues,
+            history=self.history,
         )
 
         history_entry = {
@@ -119,6 +153,15 @@ class CodeReviewEnv:
             "fixed_issue_source": developer_result.get("fixed_issue_source"),
             "fix_failed": developer_result.get("fix_failed", False),
             "introduced_bug_id": developer_result.get("introduced_bug_id"),
+            "followup_bug_id": developer_result.get("followup_bug_id"),
+            "severity_escalated_issue_id": developer_result.get("severity_escalated_issue_id"),
+            "llm_mode": llm_evaluation.get("mode"),
+            "llm_score": llm_evaluation.get("strategic_score", 0.0),
+            "llm_raw_score": llm_evaluation.get("raw_strategic_score", 0.0),
+            "llm_confidence": llm_evaluation.get("confidence", 0.0),
+            "llm_rationale": llm_evaluation.get("rationale", ""),
+            "llm_fallback_used": llm_evaluation.get("fallback_used", False),
+            "llm_alignment": llm_evaluation.get("alignment", {}),
         }
         self.history.append(history_entry)
 
@@ -128,7 +171,8 @@ class CodeReviewEnv:
 
         score_after = compute_score(
             history=self.history,
-            remaining_issues=len(self._unresolved_ground_truth()),
+            remaining_issues=remaining_after,
+            total_issues=self.total_issues,
             step_count=self.step_count,
             done=self.done,
             max_steps=self.max_steps,
@@ -148,6 +192,8 @@ class CodeReviewEnv:
             "terminated_by_steps": terminated_by_steps,
             "terminated_by_resolution": terminated_by_resolution,
             "developer_result": developer_result,
+            "llm_evaluation": llm_evaluation,
+            "llm_guidance_used": llm_guidance,
             "score_before": score_before,
             "score_after": score_after,
         }

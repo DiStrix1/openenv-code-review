@@ -83,6 +83,8 @@ class MediumTask(BaseTask):
                 "resolved": False,
                 "flagged": False,
                 "source": "ground_truth",
+                "context_hint": "ambiguous API contract",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "M2",
@@ -92,6 +94,9 @@ class MediumTask(BaseTask):
                 "resolved": False,
                 "flagged": False,
                 "source": "ground_truth",
+                "requires": ["M1"],
+                "context_hint": "input validation dependency",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "M3",
@@ -101,6 +106,8 @@ class MediumTask(BaseTask):
                 "resolved": False,
                 "flagged": False,
                 "source": "ground_truth",
+                "context_hint": "hot path under repeated access",
+                "actionable_with": ["optimize_code", "suggest_fix"],
             },
             {
                 "id": "M4",
@@ -110,6 +117,8 @@ class MediumTask(BaseTask):
                 "resolved": False,
                 "flagged": False,
                 "source": "ground_truth",
+                "context_hint": "schema inconsistency edge case",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "M5",
@@ -119,6 +128,9 @@ class MediumTask(BaseTask):
                 "resolved": False,
                 "flagged": False,
                 "source": "ground_truth",
+                "requires": ["M4"],
+                "context_hint": "cross-path id format mismatch",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "M6",
@@ -128,6 +140,9 @@ class MediumTask(BaseTask):
                 "resolved": False,
                 "flagged": False,
                 "source": "ground_truth",
+                "requires": ["M4"],
+                "context_hint": "validation order matters",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
         ]
 
@@ -194,6 +209,7 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "misleading_pattern": "partial sanitization comment",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "H2",
@@ -204,6 +220,7 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "misleading_pattern": "cache appears intentional optimization",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "H3",
@@ -214,6 +231,8 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "noisy_signal": True,
+                "requires": ["H2"],
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "H4",
@@ -224,6 +243,7 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "misleading_pattern": "appears user-friendly but weakens auth checks",
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "H5",
@@ -234,6 +254,7 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "noisy_signal": True,
+                "actionable_with": ["optimize_code", "suggest_fix"],
             },
             {
                 "id": "H6",
@@ -244,6 +265,8 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "noisy_signal": True,
+                "requires": ["H4"],
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "H7",
@@ -254,6 +277,8 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "misleading_pattern": "table parameter looks configurable but bypasses query safety",
+                "requires": ["H1"],
+                "actionable_with": ["flag_issue", "suggest_fix"],
             },
             {
                 "id": "H8",
@@ -264,5 +289,7 @@ class HardTask(BaseTask):
                 "flagged": False,
                 "source": "ground_truth",
                 "noisy_signal": True,
+                "requires": ["H5"],
+                "actionable_with": ["optimize_code", "suggest_fix"],
             },
         ]
