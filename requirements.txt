@@ -2,3 +2,5 @@ pydantic
 pyyaml
 gradio
 openai
+uvicorn
+fastapi

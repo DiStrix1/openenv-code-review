@@ -1,10 +1,28 @@
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 import gradio as gr
 
 from env.environment import CodeReviewEnv
 from env.tasks import EasyTask, MediumTask, HardTask
 from baseline.run_baseline import smart_agent
 
+app = FastAPI()
 
+
+# ─────────────────────────────────────────────
+# /reset  — required by the OpenEnv validator
+# ─────────────────────────────────────────────
+@app.post("/reset")
+def reset():
+    """Reset the environment and return the initial observation."""
+    env = CodeReviewEnv(EasyTask())
+    obs = env.reset()
+    return JSONResponse(status_code=200, content=obs.model_dump())
+
+
+# ─────────────────────────────────────────────
+# Gradio UI  — runs all tasks with baseline agent
+# ─────────────────────────────────────────────
 def run_task(task):
     env = CodeReviewEnv(task)
     obs = env.reset()
@@ -39,6 +57,5 @@ demo = gr.Interface(
     description="Runs baseline agent on all tasks"
 )
 
-
-if __name__ == "__main__":
-    demo.launch()
+# Mount Gradio at /ui so it lives alongside the FastAPI routes
+app = gr.mount_gradio_app(app, demo, path="/")

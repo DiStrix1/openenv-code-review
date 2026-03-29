@@ -206,8 +206,8 @@ This environment provides a more realistic benchmark for AI code review by captu
 
 Live Demo:
 
-- [Hugging Face Space link](https://huggingface.co/spaces/DishuMahajan/openenv-code-review-env)
+- [Hugging Face Space](https://huggingface.co/spaces/DishuMahajan/openenv-code-review-env)
 
 GitHub Repository:
 
-- [Repository link](https://github.com/DiStrix1/openenv-code-review)
+- [openenv-code-review](https://github.com/DiStrix1/openenv-code-review)
