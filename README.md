@@ -1,3 +1,14 @@
+---
+title: Openenv Code Review Env
+emoji: ??
+colorFrom: red
+colorTo: gray
+sdk: docker
+pinned: false
+license: mit
+short_description: Multi-step AI code review environment for OpenEnv hackathon
+---
+
 # OpenEnv Code Review Environment
 
 A multi-step simulation environment for evaluating AI code review agents.
