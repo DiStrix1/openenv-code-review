@@ -8,22 +8,26 @@ from env.grader import grade as grader
 from env.models import Action
 from env.tasks import EasyTask, MediumTask, HardTask
 
+# Required env vars for evaluator compatibility.
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# Optional - if you use from_docker_image():
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+
 
 def get_api_key() -> str:
-    return os.getenv("HF_TOKEN") or os.getenv("API_KEY") or ""
+    return HF_TOKEN or ""
 
 
 def build_client() -> Optional[OpenAI]:
     api_key = get_api_key()
-    base_url = os.getenv("API_BASE_URL")
-
     if not api_key:
         return None
 
     try:
-        if base_url:
-            return OpenAI(api_key=api_key, base_url=base_url)
-        return OpenAI(api_key=api_key)
+        return OpenAI(api_key=api_key, base_url=API_BASE_URL)
     except Exception:
         return None
 
@@ -77,12 +81,20 @@ def parse_action(response_text: str) -> Action:
     return Action(action_type="comment", issue_id=1)
 
 
-def run_task(task_cls, client: Optional[OpenAI], model_name: str, max_steps: int = 5) -> float:
+def run_task(
+    task_cls,
+    task_id: str,
+    client: Optional[OpenAI],
+    model_name: str,
+    max_steps: int = 5,
+) -> float:
+    print(f"[START] task={task_id}", flush=True)
+
     env = CodeReviewEnv(task=task_cls())
     observation = env.reset()
-    total_reward = 0.0
+    step = 0
 
-    for _ in range(max_steps):
+    for step in range(1, max_steps + 1):
         prompt = build_prompt(
             diff=observation.diff,
             comments=observation.comments,
@@ -92,22 +104,23 @@ def run_task(task_cls, client: Optional[OpenAI], model_name: str, max_steps: int
         action = parse_action(llm_response)
 
         observation, reward, done, _ = env.step(action)
-        total_reward += reward.value
+        print(f"[STEP] step={step} reward={reward.value:.4f}", flush=True)
 
         if done:
             break
 
     score = grader(env.state())
+    print(f"[END] task={task_id} score={score:.4f} steps={step}", flush=True)
     return score
 
 
 def main() -> None:
     client = build_client()
-    model_name = os.getenv("MODEL_NAME", "")
+    model_name = MODEL_NAME
 
-    easy_score = run_task(EasyTask, client, model_name)
-    medium_score = run_task(MediumTask, client, model_name)
-    hard_score = run_task(HardTask, client, model_name)
+    easy_score = run_task(EasyTask, "easy", client, model_name)
+    medium_score = run_task(MediumTask, "medium", client, model_name)
+    hard_score = run_task(HardTask, "hard", client, model_name)
 
     print(f"EasyTask: {easy_score}")
     print(f"MediumTask: {medium_score}")
