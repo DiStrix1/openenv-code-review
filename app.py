@@ -44,7 +44,7 @@ def run_all():
 
     for task in [EasyTask(), MediumTask(), HardTask()]:
         score = run_task(task)
-        results[task.__class__.__name__] = round(score, 2)
+        results[task.__class__.__name__] = score
 
     return results
 

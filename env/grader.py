@@ -1,5 +1,13 @@
 from env.models import PullRequest
-def grade(pr: PullRequest):
+
+_SCORE_EPSILON = 0.01
+
+
+def _strict_unit_interval(value: float) -> float:
+    return max(_SCORE_EPSILON, min(value, 1.0 - _SCORE_EPSILON))
+
+
+def grade(pr: PullRequest) -> float:
     score = 0.0
     total_weight = 0.0
 
@@ -17,6 +25,6 @@ def grade(pr: PullRequest):
             score += weight
 
     if total_weight == 0:
-        return 0.0
+        return 0.5
 
-    return round(score / total_weight, 2)
+    return _strict_unit_interval(score / total_weight)
